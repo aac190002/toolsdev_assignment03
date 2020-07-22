@@ -40,6 +40,86 @@ class EmptyBlock(object):
         return " "
 
 
+class StartBlock(object):
+    """Represents a start block"""
+
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return "S"
+
+
+class EndBlock(object):
+    """Represents an end block"""
+
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return "E"
+
+
+class DeadEndBlock(object):
+    """Represents a dead end block"""
+
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return "X"
+
+
+class StraightBlock(object):
+    """Represents a straight block"""
+
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return "\u2551"  # Unicode vertical path
+
+
+class RampBlock(object):
+    """Represents a ramp block"""
+
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return "\u2193"  # Downwards arrow pointing to the higher level
+
+
+class TIntersectionBlock(object):
+    """Represents a T intersection block"""
+
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return "\u2569"  # Unicode T path with top, left, right open
+
+
+class CrossBlock(object):
+    """Represents a cross block"""
+
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return "\u256C"  # Unicode cross path
+
+
+class CurvedBlock(object):
+    """Represents a curved block"""
+
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return "\u255A"  # Unicode curve with top, right open
+
+
 class BlockFile(object):
     """Location and type of a Block File. Part of the Controller"""
 
