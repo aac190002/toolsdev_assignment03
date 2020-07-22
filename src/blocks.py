@@ -8,7 +8,7 @@ ATCM 3311.0U1
 
 
 #====================================================== IMPORTS =======================================================#
-from enum import Enum, auto
+from enum import Enum
 from pymel.core.system import Path
 
 
@@ -19,14 +19,25 @@ DEFAULT_WEIGHT = 1.0
 #====================================================== CLASSES =======================================================#
 class BlockType(Enum):
     """Enums for all valid block types"""
-    STRAIGHT = auto()
-    RAMP = auto()
-    T_INTERSECTION = auto()
-    CROSS = auto()
-    CURVED = auto()
-    START = auto()
-    END = auto()
-    DEAD_END = auto()
+    EMPTY = 0
+    START = 1
+    END = 2
+    DEAD_END = 3
+    STRAIGHT = 4
+    RAMP = 5
+    T_INTERSECTION = 6
+    CROSS = 7
+    CURVED = 8
+
+
+class EmptyBlock(object):
+    """Represents an empty block"""
+
+    def __init__(self):
+        pass
+
+    def __str__(self):
+        return " "
 
 
 class BlockFile(object):
