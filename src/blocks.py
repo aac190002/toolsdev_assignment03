@@ -34,7 +34,7 @@ class EmptyBlock(object):
     """Represents an empty block"""
 
     def __init__(self):
-        pass
+        self.block_type = BlockType.EMPTY
 
     def __str__(self):
         return " "
@@ -44,7 +44,7 @@ class StartBlock(object):
     """Represents a start block"""
 
     def __init__(self):
-        pass
+        self.block_type = BlockType.START
 
     def __str__(self):
         return "S"
@@ -54,7 +54,7 @@ class EndBlock(object):
     """Represents an end block"""
 
     def __init__(self):
-        pass
+        self.block_type = BlockType.END
 
     def __str__(self):
         return "E"
@@ -64,7 +64,7 @@ class DeadEndBlock(object):
     """Represents a dead end block"""
 
     def __init__(self):
-        pass
+        self.block_type = BlockType.DEAD_END
 
     def __str__(self):
         return "X"
@@ -74,50 +74,50 @@ class StraightBlock(object):
     """Represents a straight block"""
 
     def __init__(self):
-        pass
+        self.block_type = BlockType.STRAIGHT
 
     def __str__(self):
-        return "\u2551"  # Unicode vertical path
+        return "|" # Doesn't show orientation
 
 
 class RampBlock(object):
     """Represents a ramp block"""
 
     def __init__(self):
-        pass
+        self.block_type = BlockType.RAMP
 
     def __str__(self):
-        return "\u2193"  # Downwards arrow pointing to the higher level
+        return "R"  # Doesn't show orientation
 
 
 class TIntersectionBlock(object):
     """Represents a T intersection block"""
 
     def __init__(self):
-        pass
+        self.block_type = BlockType.T_INTERSECTION
 
     def __str__(self):
-        return "\u2569"  # Unicode T path with top, left, right open
+        return u"T"  # Doesn't show orientation :(
 
 
 class CrossBlock(object):
     """Represents a cross block"""
 
     def __init__(self):
-        pass
+        self.block_type = BlockType.CROSS
 
     def __str__(self):
-        return "\u256C"  # Unicode cross path
+        return "+"
 
 
 class CurvedBlock(object):
     """Represents a curved block"""
 
     def __init__(self):
-        pass
+        self.block_type = BlockType.CURVED
 
     def __str__(self):
-        return "\u255A"  # Unicode curve with top, right open
+        return "L"  # Doesn't show orientation
 
 
 class BlockFile(object):
