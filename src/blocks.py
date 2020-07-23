@@ -9,7 +9,6 @@ ATCM 3311.0U1
 
 #====================================================== IMPORTS =======================================================#
 from enum import Enum
-#from pymel.core.system import Path  # TODO uncomment
 
 
 #====================================================== CONSTS ========================================================#
@@ -406,8 +405,7 @@ class BlockFile(object):
         :param block_type: Which type of block this scene file represents. Must be a BlockType
         :param weight: The randomization weight, optional
         """
-        #self.pth = Path(pth)  # TODO uncomment
-        self.pth = pth  # TODO delete
+        self.pth = pth
         self.block_type = block_type
         self.weight = weight
 
