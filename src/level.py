@@ -76,6 +76,23 @@ class Level(object):
         """
         return self._lvl[pos[X]][pos[Y]][pos[Z]]
 
+    def find_longest_dead_end(self):
+        """
+        Returns the position of the longest dead end or None if there are no dead ends
+        :return: The (X,Y,Z) position of the longest dead end
+        """
+        max_len = -1
+        max_pos = None
+        for i in range(self.size[X]):
+            for j in range(self.size[Y]):
+                for k in range(self.size[Z]):
+                    blk = self.get_block((i, j, k))
+                    if blk.block_type == blocks.BlockType.DEAD_END:
+                        if blk.length > max_len:
+                            max_pos = (i, j, k)
+                            max_len = blk.length
+        return max_pos
+
     def __str__(self):
         """
         Print representation of this level in layers
@@ -432,6 +449,16 @@ class LevelGenerator(object):
                         remaining_spots.append(pos)
 
         if not placed_end:
-            raise CannotGenerateLevelError("Could not place end block")
+            # Last effort, try replacing a dead end with an end
+            dead_end_pos = lvl.find_longest_dead_end()
+            if dead_end_pos is not None:
+                tmp_dead_end = lvl.get_block(dead_end_pos)
+                tmp_end = random.choice(end_blocks).make_block(orientation=tmp_dead_end.orientation)
+                tmp_end.length = tmp_dead_end.length
+                lvl.place_block(tmp_end, dead_end_pos)
+                placed_end = True
+                lvl.length = tmp_end.length
+            else:
+                raise CannotGenerateLevelError("Could not place end block")
 
         return lvl
