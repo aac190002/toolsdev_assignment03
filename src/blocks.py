@@ -31,6 +31,7 @@ class BlockType(Enum):
     T_INTERSECTION = 6
     CROSS = 7
     CURVED = 8
+    RAMP_DUMMY = 9
     
     
 class Orientation(Enum):
@@ -46,10 +47,10 @@ class EmptyBlock(object):
 
     def __init__(self, pth=None, weight=DEFAULT_WEIGHT, orientation=Orientation.NORTH):
         self.block_type = BlockType.EMPTY
-        self.pth = pth
-        self.weight = weight
-        self.orientation = orientation
-        self.length = -1
+        self.pth = pth  # Unused
+        self.weight = weight  # Unused
+        self.orientation = orientation  # Unused
+        self.length = -1  # Unused
 
     def __str__(self):
         return " "
@@ -250,6 +251,42 @@ class RampBlock(object):
             return [(pos[X], pos[Y], pos[Z] + 1), (pos[X], pos[Y] + 1, pos[Z] - 1)]
         else:
             return [(pos[X] + 1, pos[Y], pos[Z]), (pos[X] - 1, pos[Y] + 1, pos[Z])]
+
+
+class RampDummy(object):
+    """Represents the space above a ramp block. Can have any orientation
+
+    Defined with entrance to the north (is at a higher level at the south)
+
+      | |
+      |V|
+      | |
+    """
+
+    def __init__(self, pth=None, weight=DEFAULT_WEIGHT, orientation=Orientation.NORTH):
+        self.block_type = BlockType.RAMP_DUMMY
+        self.pth = pth  # Unused
+        self.weight = weight  # Unused
+        self.orientation = orientation
+        self.length = -1  # Unused
+
+    def __str__(self):
+        return "R"  # Doesn't show orientation :(
+
+    def adjacent(self, pos):
+        """
+        Returns all adjacent positions given the block's position
+        :param pos: The block's position
+        :return: List of adjacent positions
+        """
+        if self.orientation == Orientation.NORTH:
+            return [(pos[X], pos[Y], pos[Z] + 1)]
+        elif self.orientation == Orientation.WEST:
+            return [(pos[X] + 1, pos[Y], pos[Z])]
+        elif self.orientation == Orientation.SOUTH:
+            return [(pos[X], pos[Y], pos[Z] - 1)]
+        else:
+            return [(pos[X] - 1, pos[Y], pos[Z])]
 
 
 class TIntersectionBlock(object):

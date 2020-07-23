@@ -226,6 +226,33 @@ class LevelGenerator(object):
         return inner_filter
 
 
+    def _check_ramps(self, current_pos, lvl, other_spots):
+        """
+        Filter that makes sure ramps will work
+        :param current_pos: The ramp's position
+        :param lvl: The level
+        :param other_spots: The other pending spots
+        :return: The filter
+        """
+        def inner_filter(block):
+            if block.block_type != blocks.BlockType.RAMP:
+                return True  # This filter only affects ramps
+            # Make sure dummy spot is empty
+            dummy_spot = (current_pos[X], current_pos[Y] + 1, current_pos[Z])
+            if not lvl.is_empty(dummy_spot):
+                return False  # Remove this ramp
+            # Make sure the dummy spot is not supposed to hold some block
+            if dummy_spot in other_spots:
+                return False  # Remove this ramp
+            # Make tmp dummy and make sure its adjacent spot is empty
+            tmp_dummy = blocks.RampDummy(orientation=block.orientation)
+            for spot in tmp_dummy.adjacent(dummy_spot):
+                if not lvl.is_empty(spot):
+                    return False  # Remove this ramp
+            return True  # Accept this ramp
+        return inner_filter
+
+
     def _all_orientations(self, blockf):
         """
         Returns blocks of all orientations from a BlockFile
@@ -250,7 +277,7 @@ class LevelGenerator(object):
         :param end_blocks: The list of end blocks
         :param dead_end_blocks: The list of dead end blocks
         :param other_blocks: The list of other blocks
-        :param other_spots: Whether there are other spots besides this one
+        :param other_spots: List of other spots besides this one
         :param force_end: Whether to force placement of the end block. Should only be used for recursion
         :return: A list of valid blocks at this spot
         """
@@ -283,14 +310,20 @@ class LevelGenerator(object):
 
             # Only allow end blocks if the minimum length has been reached. Dead ends are OK if there are other spots
             if not force_end and self.minimum_length:
-                ret = filter(self._check_min_length(current_spot, lvl, other_spots), ret)
+                ret = filter(self._check_min_length(current_spot, lvl, len(other_spots) > 0), ret)
 
             # Only allow non-end blocks if the maximum length hasn't been reached
             if not force_end and self.maximum_length:
                 ret = filter(self._check_max_length(current_spot, lvl), ret)
 
+            # Filter the valid ramps
+            ret = filter(self._check_ramps(current_spot, lvl, other_spots), ret)
+
             # If there are no valid blocks, end the level
             if len(ret) == 0:
+                # Should not have recursed twice
+                if force_end:
+                    raise CannotGenerateLevelError("Could not find valid blocks and end forcing causes recursion")
                 return self._get_valid_blocks(current_spot, lvl, placed_start, placed_end, start_blocks, end_blocks,
                                               dead_end_blocks, other_blocks, other_spots, True)
 
@@ -364,7 +397,7 @@ class LevelGenerator(object):
 
             # Get a list of all valid blocks that could go in that spot
             valid_blocks = self._get_valid_blocks(current_spot, lvl, placed_start, placed_end, start_blocks, end_blocks,
-                                                  dead_end_blocks, other_blocks, len(remaining_spots) > 0)
+                                                  dead_end_blocks, other_blocks, remaining_spots)
 
             # Check to make sure that there are valid blocks
             if len(valid_blocks) == 0:
@@ -380,9 +413,16 @@ class LevelGenerator(object):
                 blist = self._get_connected_block_list(chosen_block, current_spot, lvl)
                 prev_len = min(blist, key=(lambda blk: blk.length))
                 chosen_block.length = prev_len.length + 1
+
+                # Special cases for some blocks
+                if chosen_block.block_type == blocks.BlockType.RAMP:
+                    dummy = blocks.RampDummy(orientation=chosen_block.orientation)
+                    dummy.length = chosen_block.length
+                    lvl.place_block(dummy, (current_spot[X], current_spot[Y] + 1, current_spot[Z]))
                 if chosen_block.block_type == blocks.BlockType.END:
                     placed_end = True
                     lvl.length = chosen_block.length
+
             lvl.place_block(chosen_block, current_spot)
 
             # Add all empty adjacent spots to the remaining blocks list
@@ -390,8 +430,6 @@ class LevelGenerator(object):
                 if lvl.is_valid(pos) and lvl.is_empty(pos):
                     if pos not in remaining_spots:
                         remaining_spots.append(pos)
-
-            print(lvl)  # TODO delete
 
         if not placed_end:
             raise CannotGenerateLevelError("Could not place end block")
