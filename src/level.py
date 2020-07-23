@@ -30,6 +30,7 @@ class Level(object):
         """
         self.size = size
         self._lvl = [[[blocks.EmptyBlock() for k in range(size[Z])] for j in range(size[Y])] for i in range(size[X])]
+        self.length = 0
 
     def is_valid(self, pos):
         """
@@ -116,7 +117,8 @@ class LevelGenerator(object):
         :param block_list: List of BlockFiles allowed in level generation. At least one start and end block must be
             present
         :param size: The (X,Y,Z) size of the level in blocks
-        :param minimum_length: The minimum length from start to finish. None means no minimum length
+        :param minimum_length: The minimum length from start to finish. None means no minimum length. This is just a
+            suggestion - if forced, the program may have to end the level early
         :param maximum_length: The maximum length from start to finish. None means no maximum length
         :param seed: The seed for the random number generator. None means use a random seed
         """
@@ -124,17 +126,17 @@ class LevelGenerator(object):
         self.size = size
         self.minimum_length = minimum_length
         self.maximum_length = maximum_length
+        self.seed = seed
 
     def check_size(self):
         """
         Returns whether the size is valid
         :return: True if valid size else False
         """
-        ret = True
         for coord in [X, Y, Z]:
             if self.size[coord] < MINIMUM_SIZE[coord]:
-                ret = False
-        return ret
+                return False
+        return True
 
     def _check_all_pos(self, current_pos, lvl):
         """
@@ -147,6 +149,7 @@ class LevelGenerator(object):
             for pos in block.adjacent(current_pos):
                 if not lvl.is_valid(pos):
                     return False
+            return True
         return inner_filter
 
     def _get_connected_block_list(self, block, current_pos, lvl):
@@ -168,19 +171,22 @@ class LevelGenerator(object):
                     blist.append(blk)
         return blist
 
-    def _check_min_length(self, current_pos, lvl):
+    def _check_min_length(self, current_pos, lvl, other_spots):
         """
         Filter that checks the minimum length based on the adjacent blocks
         :param current_pos: The block's position
         :param lvl: The level
+        :param other_spots: Whether there are other spots. If so, dead ends are OK
         :return: The filter
         """
         def inner_filter(block):
             if block.block_type != blocks.BlockType.END and block.block_type != blocks.BlockType.DEAD_END:
                 return True  # Don't filter non-end blocks based off of minimum length
-            blist = self._get_connected_block_list(current_pos, lvl)
+            if other_spots and block.block_type == blocks.BlockType.DEAD_END:
+                return True  # Don't filter dead end blocks if there are other chances for an end
+            blist = self._get_connected_block_list(block, current_pos, lvl)
             prev_len = min(blist, key=(lambda blk: blk.length))
-            return self.minimum_length <= prev_len + 1  # Keep end blocks if minimum length reached
+            return self.minimum_length <= prev_len.length + 1  # Keep end blocks if minimum length reached
         return inner_filter
 
     def _check_max_length(self, current_pos, lvl):
@@ -193,14 +199,14 @@ class LevelGenerator(object):
         def inner_filter(block):
             if block.block_type == blocks.BlockType.END or block.block_type == blocks.BlockType.DEAD_END:
                 return True  # Don't filter end blocks based off of maximum length
-            blist = self._get_connected_block_list(current_pos, lvl)
+            blist = self._get_connected_block_list(block, current_pos, lvl)
             prev_len = min(blist, key=(lambda blk: blk.length))
-            return self.maximum_length > prev_len + 1  # Keep non-end blocks if max length not reached
+            return self.maximum_length > prev_len.length + 1  # Keep non-end blocks if max length not reached
         return inner_filter
 
     def _check_mutual_adjacent(self, current_pos, lvl):
         """
-        Filter that makes sure that the block is mutually adjacent to any adjacent blocks
+        Filter that makes sure that the block is mutually adjacent to any adjacent blocks. One spot must not be empty
         :param current_pos: The block's position
         :param lvl: The level
         :return: The filter
@@ -208,13 +214,15 @@ class LevelGenerator(object):
         def inner_filter(block):
             spots = block.adjacent(current_pos)
             spots = filter(lvl.is_valid, spots)
+            one_not_empty = False
             for spot in spots:
                 if not lvl.is_empty(spot):
+                    one_not_empty = True
                     blk = lvl.get_block(spot)
                     if current_pos not in blk.adjacent(spot):
                         # Mismatch, block exists but not mutually adjacent
                         return False
-            return True
+            return one_not_empty
         return inner_filter
 
 
@@ -230,7 +238,7 @@ class LevelGenerator(object):
                 blockf.make_block(orientation=blocks.Orientation.EAST)]
 
     def _get_valid_blocks(self, current_spot, lvl, placed_start, placed_end, start_blocks, end_blocks, dead_end_blocks,
-                          other_blocks):
+                          other_blocks, other_spots, force_end=False):
         """
         Returns a list of valid blocks to go at a spot. Block must not lead off the edge of the world and must be
         mutually adjacent to a block, unless it is the starting block
@@ -242,6 +250,8 @@ class LevelGenerator(object):
         :param end_blocks: The list of end blocks
         :param dead_end_blocks: The list of dead end blocks
         :param other_blocks: The list of other blocks
+        :param other_spots: Whether there are other spots besides this one
+        :param force_end: Whether to force placement of the end block. Should only be used for recursion
         :return: A list of valid blocks at this spot
         """
         # List to return
@@ -253,20 +263,17 @@ class LevelGenerator(object):
                 ret.extend(self._all_orientations(blockf))
             # Make sure all adjacent blocks are valid
             ret = filter(self._check_all_pos(current_spot, lvl), ret)
-            # By definition, the length is one here
-            for block in ret:
-                block.length = 1
-            return ret, [][:]
+            return ret
         else:
             # Generate every possible block at this position
-            if not placed_end:
+            if force_end or not placed_end:
                 for blockf in end_blocks:
                     ret.extend(self._all_orientations(blockf))
-            else:
+            if not force_end:
                 for blockf in dead_end_blocks:
                     ret.extend(self._all_orientations(blockf))
-            for blockf in other_blocks:
-                ret.extend(self._all_orientations(blockf))
+                for blockf in other_blocks:
+                    ret.extend(self._all_orientations(blockf))
 
             # Make sure all adjacent blocks are valid
             ret = filter(self._check_all_pos(current_spot, lvl), ret)
@@ -274,11 +281,18 @@ class LevelGenerator(object):
             # Make sure all blocks are mutually adjacent to any adjacent blocks
             ret = filter(self._check_mutual_adjacent(current_spot, lvl), ret)
 
-            # Only allow end blocks if the minimum length has been reached
-            ret = filter(self._check_min_length(current_spot, lvl))
+            # Only allow end blocks if the minimum length has been reached. Dead ends are OK if there are other spots
+            if not force_end and self.minimum_length:
+                ret = filter(self._check_min_length(current_spot, lvl, other_spots), ret)
 
             # Only allow non-end blocks if the maximum length hasn't been reached
-            ret = filter(self._check_max_length(current_spot, lvl))
+            if not force_end and self.maximum_length:
+                ret = filter(self._check_max_length(current_spot, lvl), ret)
+
+            # If there are no valid blocks, end the level
+            if len(ret) == 0:
+                return self._get_valid_blocks(current_spot, lvl, placed_start, placed_end, start_blocks, end_blocks,
+                                              dead_end_blocks, other_blocks, other_spots, True)
 
             return ret
 
@@ -345,27 +359,37 @@ class LevelGenerator(object):
         # Main logic loop
         while len(remaining_spots) > 0:
             # Choose a random spot
-            current_spot = random.choice(remaining_spots)
+            random.shuffle(remaining_spots)
+            current_spot = remaining_spots.pop()
 
             # Get a list of all valid blocks that could go in that spot
             valid_blocks = self._get_valid_blocks(current_spot, lvl, placed_start, placed_end, start_blocks, end_blocks,
-                                                  dead_end_blocks, other_blocks)
+                                                  dead_end_blocks, other_blocks, len(remaining_spots) > 0)
+
+            # Check to make sure that there are valid blocks
+            if len(valid_blocks) == 0:
+                raise CannotGenerateLevelError("Could not determine a valid block to place at ({},{},{})"
+                                               .format(current_spot[X], current_spot[Y], current_spot[Z]))
 
             # Place a random block from the list
             chosen_block = self._choose_block(valid_blocks, current_spot)
-            blist = self._get_connected_block_list(current_spot, lvl)
-            prev_len = min(blist, key=(lambda blk: blk.length))
-            chosen_block.length = prev_len + 1
-            lvl.place_block(chosen_block, current_spot)
             if chosen_block.block_type == blocks.BlockType.START:
                 placed_start = True
-            elif chosen_block.block_type == blocks.BlockType.END:
-                placed_end = True
+                chosen_block.length = 1
+            else:
+                blist = self._get_connected_block_list(chosen_block, current_spot, lvl)
+                prev_len = min(blist, key=(lambda blk: blk.length))
+                chosen_block.length = prev_len.length + 1
+                if chosen_block.block_type == blocks.BlockType.END:
+                    placed_end = True
+                    lvl.length = chosen_block.length
+            lvl.place_block(chosen_block, current_spot)
 
             # Add all empty adjacent spots to the remaining blocks list
             for pos in chosen_block.adjacent(current_spot):
                 if lvl.is_valid(pos) and lvl.is_empty(pos):
-                    remaining_spots.append(pos)
+                    if pos not in remaining_spots:
+                        remaining_spots.append(pos)
 
             print(lvl)  # TODO delete
 
