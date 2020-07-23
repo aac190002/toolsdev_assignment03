@@ -42,7 +42,7 @@ class Orientation(Enum):
 
 
 class EmptyBlock(object):
-    """Represents an empty block. Can have any orientation"""
+    """Represents an empty block. Can have any orientation. Part of the Model"""
 
     def __init__(self, pth=None, weight=DEFAULT_WEIGHT, orientation=Orientation.NORTH):
         self.block_type = BlockType.EMPTY
@@ -64,7 +64,7 @@ class EmptyBlock(object):
 
 
 class StartBlock(object):
-    """Represents a start block. Can have any orientation
+    """Represents a start block. Can have any orientation. Part of the Model
 
     Defined with exit to the south
 
@@ -101,7 +101,7 @@ class StartBlock(object):
 
 
 class EndBlock(object):
-    """Represents an end block. Can have any orientation
+    """Represents an end block. Can have any orientation. Part of the Model
 
     Defined with entrance to the north
 
@@ -138,7 +138,7 @@ class EndBlock(object):
 
 
 class DeadEndBlock(object):
-    """Represents a dead end block. Can have any orientation
+    """Represents a dead end block. Can have any orientation. Part of the Model
 
     Defined with entrance to the north
 
@@ -175,7 +175,7 @@ class DeadEndBlock(object):
 
 
 class StraightBlock(object):
-    """Represents a straight block. Can have any orientation
+    """Represents a straight block. Can have any orientation. Part of the Model
 
     Defined with entrance to the north. Is symmetric
 
@@ -210,7 +210,7 @@ class StraightBlock(object):
 
 
 class RampBlock(object):
-    """Represents a ramp block. Can have any orientation
+    """Represents a ramp block. Can have any orientation. Part of the Model
 
     Defined with entrance to the north (is at a higher level at the south)
 
@@ -253,7 +253,7 @@ class RampBlock(object):
 
 
 class RampDummy(object):
-    """Represents the space above a ramp block. Can have any orientation
+    """Represents the space above a ramp block. Can have any orientation. Part of the Model
 
     Defined with entrance to the north (is at a higher level at the south)
 
@@ -289,7 +289,7 @@ class RampDummy(object):
 
 
 class TIntersectionBlock(object):
-    """Represents a T intersection block. Can have any orientation
+    """Represents a T intersection block. Can have any orientation. Part of the Model
 
     Defined with entrance to the north. Can be entered from any side
 
@@ -326,7 +326,7 @@ class TIntersectionBlock(object):
 
 
 class CrossBlock(object):
-    """Represents a cross block. Can have any orientation
+    """Represents a cross block. Can have any orientation. Part of the Model
 
     Defined with entrance to the north. Can be entered from any side
 
@@ -358,7 +358,7 @@ class CrossBlock(object):
 
 
 class CurvedBlock(object):
-    """Represents a curved block. Can have any orientation
+    """Represents a curved block. Can have any orientation. Part of the Model
 
     Defined with entrance to the north. Can be entered from any side
 

@@ -21,7 +21,7 @@ MINIMUM_SIZE = (1,1,2)  # Need room for at least a start block and an end block
 
 #====================================================== CLASSES =======================================================#
 class Level(object):
-    """Represents an instance level full of block instances"""
+    """Represents an instance level full of block instances. This is the Model"""
 
     def __init__(self, size=MINIMUM_SIZE):
         """
@@ -126,7 +126,7 @@ class CannotGenerateLevelError(Exception):
 
 
 class LevelGenerator(object):
-    """Generates a level based on settings given"""
+    """Generates a level based on settings given. This is the Controller"""
 
     def __init__(self, block_list, size=MINIMUM_SIZE, minimum_length=None, maximum_length=None, seed=None):
         """
