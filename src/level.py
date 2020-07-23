@@ -16,7 +16,7 @@ import random
 X = 0  # Element of size tuple
 Y = 1  # Element of size tuple
 Z = 2  # Element of size tuple
-MINIMUM_SIZE = (1,1,2)  # Need room for at least a start block and an end block
+MINIMUM_SIZE = (1, 1, 2)  # Need room for at least a start block and an end block
 
 
 #====================================================== CLASSES =======================================================#
@@ -239,7 +239,23 @@ class LevelGenerator(object):
                     if current_pos not in blk.adjacent(spot):
                         # Mismatch, block exists but not mutually adjacent
                         return False
-            return one_not_empty
+            if not one_not_empty:
+                return False
+            # Need to search for any blocks to which this block was supposed to be adjacent
+            possible_spots = [][:]
+            for j in [current_pos[Y], current_pos[Y]-1]:  # Y-1 needed for ramps
+                possible_spots.extend([(current_pos[X] + 1, j, current_pos[Z] + 0),
+                                       (current_pos[X] - 1, j, current_pos[Z] + 0),
+                                       (current_pos[X] + 0, j, current_pos[Z] + 1),
+                                       (current_pos[X] + 0, j, current_pos[Z] - 1)])
+            for spot in possible_spots:
+                if lvl.is_valid(spot) and not lvl.is_empty(spot):
+                    blk = lvl.get_block(spot)
+                    if current_pos in blk.adjacent(spot):
+                        # If this block is adjacent to that, that must be adjacent to this unless ramp
+                        if blk.block_type != blocks.BlockType.RAMP and spot not in block.adjacent(current_pos):
+                            return False
+            return True
         return inner_filter
 
 
