@@ -9,11 +9,14 @@ ATCM 3311.0U1
 
 #====================================================== IMPORTS =======================================================#
 from enum import Enum
-from pymel.core.system import Path
+#from pymel.core.system import Path  # TODO uncomment
 
 
 #====================================================== CONSTS ========================================================#
 DEFAULT_WEIGHT = 1.0
+X = 0  # Element of size tuple
+Y = 1  # Element of size tuple
+Z = 2  # Element of size tuple
 
 
 #====================================================== CLASSES =======================================================#
@@ -41,12 +44,23 @@ class Orientation(Enum):
 class EmptyBlock(object):
     """Represents an empty block. Can have any orientation"""
 
-    def __init__(self, orientation=Orientation.NORTH):
+    def __init__(self, pth=None, weight=DEFAULT_WEIGHT, orientation=Orientation.NORTH):
         self.block_type = BlockType.EMPTY
+        self.pth = pth
+        self.weight = weight
         self.orientation = orientation
+        self.length = -1
 
     def __str__(self):
         return " "
+
+    def adjacent(self, pos):
+        """
+        Returns all adjacent positions given the block's position
+        :param pos: The block's position
+        :return: List of adjacent positions
+        """
+        return []
 
 
 class StartBlock(object):
@@ -60,12 +74,30 @@ class StartBlock(object):
       | |
     """
 
-    def __init__(self, orientation=Orientation.NORTH):
+    def __init__(self, pth=None, weight=DEFAULT_WEIGHT, orientation=Orientation.NORTH):
         self.block_type = BlockType.START
+        self.pth = pth
+        self.weight = weight
         self.orientation = orientation
+        self.length = -1
 
     def __str__(self):
         return "S"
+
+    def adjacent(self, pos):
+        """
+        Returns all adjacent positions given the block's position
+        :param pos: The block's position
+        :return: List of adjacent positions
+        """
+        if self.orientation == Orientation.NORTH:
+            return [(pos[X], pos[Y], pos[Z] + 1)]
+        elif self.orientation == Orientation.WEST:
+            return [(pos[X] + 1, pos[Y], pos[Z])]
+        elif self.orientation == Orientation.SOUTH:
+            return [(pos[X], pos[Y], pos[Z] - 1)]
+        else:
+            return [(pos[X] - 1, pos[Y], pos[Z])]
 
 
 class EndBlock(object):
@@ -79,12 +111,30 @@ class EndBlock(object):
     +-----+
     """
 
-    def __init__(self, orientation=Orientation.NORTH):
+    def __init__(self, pth=None, weight=DEFAULT_WEIGHT, orientation=Orientation.NORTH):
         self.block_type = BlockType.END
+        self.pth = pth
+        self.weight = weight
         self.orientation = orientation
+        self.length = -1
 
     def __str__(self):
         return "E"
+
+    def adjacent(self, pos):
+        """
+        Returns all adjacent positions given the block's position
+        :param pos: The block's position
+        :return: List of adjacent positions
+        """
+        if self.orientation == Orientation.NORTH:
+            return [(pos[X], pos[Y], pos[Z] - 1)]
+        elif self.orientation == Orientation.WEST:
+            return [(pos[X] - 1, pos[Y], pos[Z])]
+        elif self.orientation == Orientation.SOUTH:
+            return [(pos[X], pos[Y], pos[Z] + 1)]
+        else:
+            return [(pos[X] + 1, pos[Y], pos[Z])]
 
 
 class DeadEndBlock(object):
@@ -98,12 +148,30 @@ class DeadEndBlock(object):
     +-----+
     """
 
-    def __init__(self, orientation=Orientation.NORTH):
+    def __init__(self, pth=None, weight=DEFAULT_WEIGHT, orientation=Orientation.NORTH):
         self.block_type = BlockType.DEAD_END
+        self.pth = pth
+        self.weight = weight
         self.orientation = orientation
+        self.length = -1
 
     def __str__(self):
         return "X"
+
+    def adjacent(self, pos):
+        """
+        Returns all adjacent positions given the block's position
+        :param pos: The block's position
+        :return: List of adjacent positions
+        """
+        if self.orientation == Orientation.NORTH:
+            return [(pos[X], pos[Y], pos[Z] - 1)]
+        elif self.orientation == Orientation.WEST:
+            return [(pos[X] - 1, pos[Y], pos[Z])]
+        elif self.orientation == Orientation.SOUTH:
+            return [(pos[X], pos[Y], pos[Z] + 1)]
+        else:
+            return [(pos[X] + 1, pos[Y], pos[Z])]
 
 
 class StraightBlock(object):
@@ -116,12 +184,29 @@ class StraightBlock(object):
       | |
     """
 
-    def __init__(self, orientation=Orientation.NORTH):
+    def __init__(self, pth=None, weight=DEFAULT_WEIGHT, orientation=Orientation.NORTH):
         self.block_type = BlockType.STRAIGHT
+        self.pth = pth
+        self.weight = weight
         self.orientation = orientation
+        self.length = -1
 
     def __str__(self):
-        return "|" # Doesn't show orientation
+        if self.orientation == Orientation.NORTH or self.orientation == Orientation.SOUTH:
+            return "|"
+        else:
+            return "-"
+
+    def adjacent(self, pos):
+        """
+        Returns all adjacent positions given the block's position
+        :param pos: The block's position
+        :return: List of adjacent positions
+        """
+        if self.orientation == Orientation.NORTH or self.orientation == Orientation.SOUTH:
+            return [(pos[X], pos[Y], pos[Z] - 1), (pos[X], pos[Y], pos[Z] + 1)]
+        else:
+            return [(pos[X] - 1, pos[Y], pos[Z]), (pos[X] + 1, pos[Y], pos[Z])]
 
 
 class RampBlock(object):
@@ -134,12 +219,37 @@ class RampBlock(object):
       | |
     """
 
-    def __init__(self, orientation=Orientation.NORTH):
+    def __init__(self, pth=None, weight=DEFAULT_WEIGHT, orientation=Orientation.NORTH):
         self.block_type = BlockType.RAMP
+        self.pth = pth
+        self.weight = weight
         self.orientation = orientation
+        self.length = -1
 
     def __str__(self):
-        return "R"  # Doesn't show orientation
+        if self.orientation == Orientation.NORTH:
+            return "V"
+        elif self.orientation == Orientation.WEST:
+            return ">"
+        elif self.orientation == Orientation.SOUTH:
+            return "^"
+        else:
+            return "<"
+
+    def adjacent(self, pos):
+        """
+        Returns all adjacent positions given the block's position
+        :param pos: The block's position
+        :return: List of adjacent positions
+        """
+        if self.orientation == Orientation.NORTH:
+            return [(pos[X], pos[Y], pos[Z] - 1), (pos[X], pos[Y] + 1, pos[Z] + 1)]
+        elif self.orientation == Orientation.WEST:
+            return [(pos[X] - 1, pos[Y], pos[Z]), (pos[X] + 1, pos[Y] + 1, pos[Z])]
+        elif self.orientation == Orientation.SOUTH:
+            return [(pos[X], pos[Y], pos[Z] + 1), (pos[X], pos[Y] + 1, pos[Z] - 1)]
+        else:
+            return [(pos[X] + 1, pos[Y], pos[Z]), (pos[X] - 1, pos[Y] + 1, pos[Z])]
 
 
 class TIntersectionBlock(object):
@@ -153,12 +263,30 @@ class TIntersectionBlock(object):
     -------------
     """
 
-    def __init__(self, orientation=Orientation.NORTH):
+    def __init__(self, pth=None, weight=DEFAULT_WEIGHT, orientation=Orientation.NORTH):
         self.block_type = BlockType.T_INTERSECTION
+        self.pth = pth
+        self.weight = weight
         self.orientation = orientation
+        self.length = -1
 
     def __str__(self):
-        return u"T"  # Doesn't show orientation :(
+        return "T"  # Doesn't show orientation :(
+
+    def adjacent(self, pos):
+        """
+        Returns all adjacent positions given the block's position
+        :param pos: The block's position
+        :return: List of adjacent positions
+        """
+        if self.orientation == Orientation.NORTH:
+            return [(pos[X], pos[Y], pos[Z] - 1), (pos[X] - 1, pos[Y], pos[Z]), (pos[X] + 1, pos[Y], pos[Z])]
+        elif self.orientation == Orientation.WEST:
+            return [(pos[X] - 1, pos[Y], pos[Z]), (pos[X], pos[Y], pos[Z] - 1), (pos[X], pos[Y], pos[Z] + 1)]
+        elif self.orientation == Orientation.SOUTH:
+            return [(pos[X], pos[Y], pos[Z] + 1), (pos[X] - 1, pos[Y], pos[Z]), (pos[X] + 1, pos[Y], pos[Z])]
+        else:
+            return [(pos[X] + 1, pos[Y], pos[Z]), (pos[X], pos[Y], pos[Z] - 1), (pos[X], pos[Y], pos[Z] + 1)]
 
 
 class CrossBlock(object):
@@ -173,12 +301,24 @@ class CrossBlock(object):
          | |
     """
 
-    def __init__(self, orientation=Orientation.NORTH):
+    def __init__(self, pth=None, weight=DEFAULT_WEIGHT, orientation=Orientation.NORTH):
         self.block_type = BlockType.CROSS
+        self.pth = pth
+        self.weight = weight
         self.orientation = orientation
+        self.length = -1
 
     def __str__(self):
         return "+"
+
+    def adjacent(self, pos):
+        """
+        Returns all adjacent positions given the block's position
+        :param pos: The block's position
+        :return: List of adjacent positions
+        """
+        return [(pos[X], pos[Y], pos[Z] - 1), (pos[X], pos[Y], pos[Z] + 1),
+                (pos[X] - 1, pos[Y], pos[Z]), (pos[X] + 1, pos[Y], pos[Z])]
 
 
 class CurvedBlock(object):
@@ -192,12 +332,30 @@ class CurvedBlock(object):
     +-------
     """
 
-    def __init__(self, orientation=Orientation.NORTH):
+    def __init__(self, pth=None, weight=DEFAULT_WEIGHT, orientation=Orientation.NORTH):
         self.block_type = BlockType.CURVED
+        self.pth = pth
+        self.weight = weight
         self.orientation = orientation
+        self.length = -1
 
     def __str__(self):
-        return "L"  # Doesn't show orientation
+        return "C"  # Doesn't show orientation :(
+
+    def adjacent(self, pos):
+        """
+        Returns all adjacent positions given the block's position
+        :param pos: The block's position
+        :return: List of adjacent positions
+        """
+        if self.orientation == Orientation.NORTH:
+            return [(pos[X], pos[Y], pos[Z] - 1), (pos[X] + 1, pos[Y], pos[Z])]
+        elif self.orientation == Orientation.WEST:
+            return [(pos[X] - 1, pos[Y], pos[Z]), (pos[X], pos[Y], pos[Z] - 1)]
+        elif self.orientation == Orientation.SOUTH:
+            return [(pos[X], pos[Y], pos[Z] + 1), (pos[X] - 1, pos[Y], pos[Z])]
+        else:
+            return [(pos[X] + 1, pos[Y], pos[Z]), (pos[X], pos[Y], pos[Z] + 1)]
 
 
 class BlockFile(object):
@@ -211,6 +369,33 @@ class BlockFile(object):
         :param block_type: Which type of block this scene file represents. Must be a BlockType
         :param weight: The randomization weight, optional
         """
-        self.pth = Path(pth)
+        #self.pth = Path(pth)  # TODO uncomment
+        self.pth = pth  # TODO delete
         self.block_type = block_type
         self.weight = weight
+
+    def make_block(self, orientation=Orientation.NORTH):
+        """
+        Makes a block from the block file. Note that a base class is unnecessary due to duck typing
+        :return: The block
+        """
+        if not self.pth:
+            return EmptyBlock()
+        if self.block_type == BlockType.START:
+            return StartBlock(pth=self.pth, weight=self.weight, orientation=orientation)
+        if self.block_type == BlockType.END:
+            return EndBlock(pth=self.pth, weight=self.weight, orientation=orientation)
+        if self.block_type == BlockType.DEAD_END:
+            return DeadEndBlock(pth=self.pth, weight=self.weight, orientation=orientation)
+        if self.block_type == BlockType.STRAIGHT:
+            return StraightBlock(pth=self.pth, weight=self.weight, orientation=orientation)
+        if self.block_type == BlockType.RAMP:
+            return RampBlock(pth=self.pth, weight=self.weight, orientation=orientation)
+        if self.block_type == BlockType.T_INTERSECTION:
+            return TIntersectionBlock(pth=self.pth, weight=self.weight, orientation=orientation)
+        if self.block_type == BlockType.CROSS:
+            return CrossBlock(pth=self.pth, weight=self.weight, orientation=orientation)
+        if self.block_type == BlockType.CURVED:
+            return CurvedBlock(pth=self.pth, weight=self.weight, orientation=orientation)
+        else:
+            return EmptyBlock()
