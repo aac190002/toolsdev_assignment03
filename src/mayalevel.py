@@ -112,8 +112,8 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         super(MayaSceneLevelGeneratorUI, self).__init__(parent=maya_main_window())
 
         # Create the generators needed
-        self._level_gen = level.LevelGenerator(None)  # Fill in in refresh window
-        self._scene_gen = MayaSceneLevelGenerator(None)  # Fill in at button press time
+        self._level_gen = level.LevelGenerator([blocks.BlockFile("", blk_type) for blk_type in VALID_BLOCK_TYPES])
+        self._scene_gen = MayaSceneLevelGenerator(None)  # Fill in level at button press time
 
         # Window things
         self.setWindowTitle("Maya Scene Level Generator")
@@ -125,6 +125,8 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         self._create_layout()
         self._refresh_view()
         self._create_connections()  # Order matters, since refreshing triggers connections
+
+        print(self._level_gen.block_list)  # TODO delete
 
     def _refresh_view(self):
         """
@@ -161,6 +163,12 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
 
         # Group Name
         self._group_name_le.setText(self._scene_gen.group_name)
+
+        # Object Block List
+        for blk_type in VALID_BLOCK_TYPES:
+            idx = VALID_BLOCK_TYPES.index(blk_type)
+            self._object_blocks[blk_type]["pth_le"].setText(self._level_gen.block_list[idx].pth)
+            self._object_blocks[blk_type]["weight_spinbox"].setValue(self._level_gen.block_list[idx].weight)
 
     def _create_widgets(self):
         """Create widgets for the UI"""
@@ -404,6 +412,11 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         # Group Name
         self._group_name_le.textEdited.connect(self._set_group_name)
 
+        # Object Blocks
+        for blk_type in VALID_BLOCK_TYPES:
+            self._object_blocks[blk_type]["pth_le"].textEdited.connect(self._object_block_pth(blk_type))
+            self._object_blocks[blk_type]["weight_spinbox"].valueChanged.connect(self._object_block_weight(blk_type))
+
         # Buttons
         self._cancel_btn.clicked.connect(self._cancel)
         self._generate_btn.clicked.connect(self._generate)
@@ -530,6 +543,32 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         """Sets the group name for reading the Maya scene files"""
         self._scene_gen.group_name = self._group_name_le.text()
         self._refresh_view()
+
+    def _object_block_pth(self, blk_type):
+        """
+        Returns the Slot for editing an object block's path
+        :param blk_type: The block type
+        :return: The Slot
+        """
+        @PySide2.QtCore.Slot()
+        def inner_slot():
+            idx = VALID_BLOCK_TYPES.index(blk_type)
+            self._level_gen.block_list[idx].pth = self._object_blocks[blk_type]["pth_le"].text()
+            self._refresh_view()
+        return inner_slot
+
+    def _object_block_weight(self, blk_type):
+        """
+        Returns the Slot for editing an object block's weight
+        :param blk_type: The block type
+        :return: The Slot
+        """
+        @PySide2.QtCore.Slot()
+        def inner_slot():
+            idx = VALID_BLOCK_TYPES.index(blk_type)
+            self._level_gen.block_list[idx].weight = self._object_blocks[blk_type]["weight_spinbox"].value()
+            self._refresh_view()
+        return inner_slot
 
     @PySide2.QtCore.Slot()
     def _cancel(self):
