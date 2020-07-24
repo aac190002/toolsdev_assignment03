@@ -10,6 +10,7 @@ ATCM 3311.0U1
 #====================================================== IMPORTS =======================================================#
 import blocks
 import level
+
 import logging
 import maya.OpenMayaUI as omui
 import pymel.core.general as pmcg
@@ -29,6 +30,18 @@ MAXIMUM_BLOCK_DIMENSION = 1e6  # The code has no maximum, but for the sake of th
 MAXIMUM_BLOCK_PRECISION = 2  # The code has no maximum, but for the sake of the UI, we should set one
 MAXIMUM_SIZE = (50, 10, 50)  # The code has no maximum, but for the sake of running quickly, we should set one
 MAXIMUM_LENGTH = MAXIMUM_SIZE[X] * MAXIMUM_SIZE[Y] * MAXIMUM_SIZE[Z]  # Longest possible path
+MAXIMUM_WEIGHT_DIMENSION = 1e6  # The code has no maximum, but for the sake of the UI, we should set one
+MAXIMUM_WEIGHT_PRECISION = 2  # The code has no maximum, but for the sake of the UI, we should set one
+VALID_BLOCK_TYPES = (  # List of block types to request in the UI
+    blocks.BlockType.START,
+    blocks.BlockType.END,
+    blocks.BlockType.DEAD_END,
+    blocks.BlockType.STRAIGHT,
+    blocks.BlockType.RAMP,
+    blocks.BlockType.T_INTERSECTION,
+    blocks.BlockType.CROSS,
+    blocks.BlockType.CURVED,
+)
 
 
 #===================================================== FUNCTIONS =======================================================#
@@ -58,6 +71,9 @@ class MayaSceneLevelGenerator(object):
         Generate the maya scene file
         :return: None
         """
+        # Clear the scene for the level
+        pmcs.newFile(force=True)
+
         # Pivot for rotation
         pivot = (self.block_dimensions[X]/2.0, 0, self.block_dimensions[Z]/2.0)
 
@@ -96,9 +112,7 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         super(MayaSceneLevelGeneratorUI, self).__init__(parent=maya_main_window())
 
         # Create the generators needed
-        self._level = None
-        self._block_list = [][:]  # Visual blocks, not just the BlockFiles
-        self._level_gen = level.LevelGenerator(None)  # Fill in at button press time
+        self._level_gen = level.LevelGenerator(None)  # Fill in in refresh window
         self._scene_gen = MayaSceneLevelGenerator(None)  # Fill in at button press time
 
         # Window things
@@ -220,6 +234,35 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         self._group_name_lbl = PySide2.QtWidgets.QLabel("Maya Group Name")
         self._group_name_le = PySide2.QtWidgets.QLineEdit()
 
+        # Object Block Group
+        self._block_group_box = PySide2.QtWidgets.QGroupBox()
+        self._block_group_box.setTitle("Object Block Settings")
+
+        # Object Blocks
+        self._object_blocks = dict()
+        for blk_type in VALID_BLOCK_TYPES:
+            self._object_blocks[blk_type] = dict()
+            self._object_blocks[blk_type]["group"] = PySide2.QtWidgets.QGroupBox()
+            self._object_blocks[blk_type]["group"].setTitle(blocks.BLOCK_TYPE_STR[blk_type])
+            self._object_blocks[blk_type]["group"].setStyleSheet("QGroupBox{border: 5px solid #444444;}")
+
+            # Path
+            self._object_blocks[blk_type]["pth_lbl"] = PySide2.QtWidgets.QLabel("Path")
+            self._object_blocks[blk_type]["pth_le"] = PySide2.QtWidgets.QLineEdit()
+
+            # Weight
+            self._object_blocks[blk_type]["weight_lbl"] = PySide2.QtWidgets.QLabel("Weight")
+            self._object_blocks[blk_type]["weight_spinbox"] = PySide2.QtWidgets.QDoubleSpinBox()
+            self._object_blocks[blk_type]["weight_spinbox"].setMinimum(0)
+            self._object_blocks[blk_type]["weight_spinbox"].setMaximum(MAXIMUM_WEIGHT_DIMENSION)
+            self._object_blocks[blk_type]["weight_spinbox"].setDecimals(MAXIMUM_WEIGHT_PRECISION)
+            self._object_blocks[blk_type]["weight_spinbox"].setSingleStep(
+                float("1e-{}".format(MAXIMUM_WEIGHT_PRECISION)))
+
+        # Buttons
+        self._cancel_btn = PySide2.QtWidgets.QPushButton("Cancel")
+        self._generate_btn = PySide2.QtWidgets.QPushButton("Generate")
+
     def _create_layout(self):
         """Lay out the UI elements"""
         # Level Size
@@ -255,7 +298,6 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         self._seed_lay.addWidget(self._seed_checkbox)
         self._seed_lay.addSpacing(5)
         self._seed_lay.addWidget(self._seed_le)
-        self._seed_lay.addStretch()
 
         # Generator Settings Group Box
         self._generator_lay = PySide2.QtWidgets.QVBoxLayout()
@@ -284,7 +326,6 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         self._group_name_lay.addWidget(self._group_name_lbl)
         self._group_name_lay.addSpacing(10)
         self._group_name_lay.addWidget(self._group_name_le)
-        self._group_name_lay.addStretch()
 
         # Maya Scene Group Box
         self._scene_lay = PySide2.QtWidgets.QVBoxLayout()
@@ -292,10 +333,46 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         self._scene_lay.addLayout(self._group_name_lay)
         self._scene_group_box.setLayout(self._scene_lay)
 
+        # Object Blocks
+        for blk_type in VALID_BLOCK_TYPES:
+            # Path
+            self._object_blocks[blk_type]["pth_lay"] = PySide2.QtWidgets.QHBoxLayout()
+            self._object_blocks[blk_type]["pth_lay"].addWidget(self._object_blocks[blk_type]["pth_lbl"])
+            self._object_blocks[blk_type]["pth_lay"].addSpacing(10)
+            self._object_blocks[blk_type]["pth_lay"].addWidget(self._object_blocks[blk_type]["pth_le"])
+            
+            # Weight
+            self._object_blocks[blk_type]["weight_lay"] = PySide2.QtWidgets.QHBoxLayout()
+            self._object_blocks[blk_type]["weight_lay"].addWidget(self._object_blocks[blk_type]["weight_lbl"])
+            self._object_blocks[blk_type]["weight_lay"].addSpacing(10)
+            self._object_blocks[blk_type]["weight_lay"].addWidget(self._object_blocks[blk_type]["weight_spinbox"])
+            self._object_blocks[blk_type]["weight_lay"].addStretch()
+
+            # Object Block Group
+            self._object_blocks[blk_type]["group_lay"] = PySide2.QtWidgets.QVBoxLayout()
+            self._object_blocks[blk_type]["group_lay"].addSpacing(15)
+            self._object_blocks[blk_type]["group_lay"].addLayout(self._object_blocks[blk_type]["pth_lay"])
+            self._object_blocks[blk_type]["group_lay"].addLayout(self._object_blocks[blk_type]["weight_lay"])
+            self._object_blocks[blk_type]["group"].setLayout(self._object_blocks[blk_type]["group_lay"])
+
+        # Object Block Group Box
+        self._block_lay = PySide2.QtWidgets.QVBoxLayout()
+        for blk_type in VALID_BLOCK_TYPES:
+            self._block_lay.addWidget(self._object_blocks[blk_type]["group"])
+        self._block_group_box.setLayout(self._block_lay)
+
+        # Buttons
+        self._button_lay = PySide2.QtWidgets.QHBoxLayout()
+        self._button_lay.addWidget(self._cancel_btn)
+        self._block_size_lay.addSpacing(5)
+        self._button_lay.addWidget(self._generate_btn)
+
         # Main
         self._main_lay = PySide2.QtWidgets.QVBoxLayout()
         self._main_lay.addWidget(self._generator_group_box)
         self._main_lay.addWidget(self._scene_group_box)
+        self._main_lay.addWidget(self._block_group_box)
+        self._main_lay.addLayout(self._button_lay)
 
         # Set the layout
         self.setLayout(self._main_lay)
@@ -326,6 +403,10 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
 
         # Group Name
         self._group_name_le.textEdited.connect(self._set_group_name)
+
+        # Buttons
+        self._cancel_btn.clicked.connect(self._cancel)
+        self._generate_btn.clicked.connect(self._generate)
 
     def _block_signals(self):
         """Block signals while updating info"""
@@ -449,3 +530,23 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         """Sets the group name for reading the Maya scene files"""
         self._scene_gen.group_name = self._group_name_le.text()
         self._refresh_view()
+
+    @PySide2.QtCore.Slot()
+    def _cancel(self):
+        """Quits the dialog"""
+        self.close()
+
+    @PySide2.QtCore.Slot()
+    def _generate(self):
+        """Generates the level"""
+        # Try to generate level and report errors
+        try:
+            self._scene_gen.lvl = self._level_gen.generate()
+            self._scene_gen.generate()
+        except level.CannotGenerateLevelError as err:
+            LOG.error(err.message)
+
+        # Give warning if minimum length not met
+        if self._scene_gen.lvl.length < self._level_gen.minimum_length:
+            LOG.warn("Level length {} is less than desired minimum {}".format(self._scene_gen.lvl.length,
+                                                                              self._level_gen.minimum_length))

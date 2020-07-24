@@ -31,6 +31,21 @@ class BlockType(Enum):
     CROSS = 7
     CURVED = 8
     RAMP_DUMMY = 9
+
+
+# This is a const but closely linked and related to BlockType
+BLOCK_TYPE_STR = {  # Get block type as a string for the user
+    BlockType.EMPTY: "Empty",
+    BlockType.START: "Start",
+    BlockType.END: "End",
+    BlockType.DEAD_END: "Dead End",
+    BlockType.STRAIGHT: "Straight",
+    BlockType.RAMP: "Ramp",
+    BlockType.T_INTERSECTION: "T-Intersection",
+    BlockType.CROSS: "Cross",
+    BlockType.CURVED: "Curved",
+    BlockType.RAMP_DUMMY: "Ramp Dummy",
+}
     
     
 class Orientation(Enum):
