@@ -1,5 +1,5 @@
 """
-level.py
+mayalevel.py
 Asmita Chitale
 Assignment 03
 ATCM 3311.0U1
@@ -9,8 +9,13 @@ ATCM 3311.0U1
 
 #====================================================== IMPORTS =======================================================#
 import blocks
+import level
+import logging
+import maya.OpenMayaUI as omui
 import pymel.core.general as pmcg
 import pymel.core.system as pmcs
+import PySide2
+import shiboken2
 
 
 #====================================================== CONSTS ========================================================#
@@ -19,6 +24,16 @@ Y = 1  # Element of size tuple
 Z = 2  # Element of size tuple
 DEFAULT_BLOCK_SIZE = (10, 5, 10)  # Default dimensions for a unit block in Maya
 DEFAULT_GROUP_NAME = "groupBlock"  # Default name for the group to look for within the Maya scenes
+LOG = logging.getLogger(__name__)
+MAXIMUM_SIZE = (50, 10, 50)  # The code has no maximum, but for the sake of running quickly, we should set one
+MAXIMUM_LENGTH = MAXIMUM_SIZE[X] * MAXIMUM_SIZE[Y] * MAXIMUM_SIZE[Z]  # Longest possible path
+
+
+#===================================================== FUNCTIONS =======================================================#
+def maya_main_window():
+    """Return the maya main window widget"""
+    main_window = omui.MQtUtil.mainWindow()
+    return shiboken2.wrapInstance(long(main_window), PySide2.QtWidgets.QWidget)
 
 
 #====================================================== CLASSES =======================================================#
@@ -68,3 +83,261 @@ class MayaSceneLevelGenerator(object):
                                     j * self.block_dimensions[Y],
                                     k * self.block_dimensions[Z]]
                         pmcg.move(new_name, new_spot)
+
+
+class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
+    """Maya Scene Level Generator UI Class. Is the View"""
+
+    def __init__(self):
+        """Constructor, take needed actions"""
+        # Passing the class make this Python 2 and Python 3 compatible
+        super(MayaSceneLevelGeneratorUI, self).__init__(parent=maya_main_window())
+
+        # Create the generators needed
+        self._level = None
+        self._block_list = [][:]  # Visual blocks, not just the BlockFiles
+        self._level_gen = level.LevelGenerator(None)  # Fill in at button press time
+        self._scene_gen = MayaSceneLevelGenerator(None)  # Fill in at button press time
+
+        # Window things
+        self.setWindowTitle("Maya Scene Level Generator")
+        self.resize(500, 200)
+        self.setWindowFlags(self.windowFlags() ^ PySide2.QtCore.Qt.WindowContextHelpButtonHint)
+
+        # Set up for the first time
+        self._create_widgets()
+        self._create_layout()
+        self._refresh_view()
+        self._create_connections()  # Order matters, since refreshing triggers connections
+
+    def _refresh_view(self):
+        """
+        Refreshes the window with new data
+        :param from_spinbox: Whether this request is coming from a spinbox. If so, no need to update spinboxes
+        :return: None
+        """
+        # Level Size
+        self._level_size_x_spinbox.setValue(self._level_gen.size[X])
+        self._level_size_y_spinbox.setValue(self._level_gen.size[Y])
+        self._level_size_z_spinbox.setValue(self._level_gen.size[Z])
+
+        # Minimum Length
+        self._minimum_length_checkbox.setChecked(self._level_gen.minimum_length is not None)
+        self._minimum_length_spinbox.setValue(self._level_gen.minimum_length
+                                              if self._level_gen.minimum_length is not None else 0)
+        self._minimum_length_spinbox.setEnabled(self._level_gen.minimum_length is not None)
+
+        # Maximum Length
+        self._maximum_length_checkbox.setChecked(self._level_gen.maximum_length is not None)
+        self._maximum_length_spinbox.setValue(self._level_gen.maximum_length
+                                              if self._level_gen.maximum_length is not None else MAXIMUM_LENGTH)
+        self._maximum_length_spinbox.setEnabled(self._level_gen.maximum_length is not None)
+
+        # Seed
+        self._seed_checkbox.setChecked(self._level_gen.seed is not None)
+        self._seed_le.setText(str(self._level_gen.seed) if self._level_gen.seed is not None else "")
+        self._seed_le.setEnabled(self._level_gen.seed is not None)
+
+    def _create_widgets(self):
+        """Create widgets for the UI"""
+        # Generator Settings Group
+        self._generator_group_box = PySide2.QtWidgets.QGroupBox()
+        self._generator_group_box.setTitle("Generator Settings")
+
+        # Level Size
+        self._level_size_lbl = PySide2.QtWidgets.QLabel("Level Size")
+        # X
+        self._level_size_x_lbl = PySide2.QtWidgets.QLabel("X")
+        self._level_size_x_spinbox = PySide2.QtWidgets.QSpinBox()
+        self._level_size_x_spinbox.setMinimum(level.MINIMUM_SIZE[X])
+        self._level_size_x_spinbox.setMaximum(MAXIMUM_SIZE[X])
+        # Y
+        self._level_size_y_lbl = PySide2.QtWidgets.QLabel("Y")
+        self._level_size_y_spinbox = PySide2.QtWidgets.QSpinBox()
+        self._level_size_y_spinbox.setMinimum(level.MINIMUM_SIZE[Y])
+        self._level_size_x_spinbox.setMaximum(MAXIMUM_SIZE[Y])
+        # Z
+        self._level_size_z_lbl = PySide2.QtWidgets.QLabel("Z")
+        self._level_size_z_spinbox = PySide2.QtWidgets.QSpinBox()
+        self._level_size_z_spinbox.setMinimum(level.MINIMUM_SIZE[Z])
+        self._level_size_x_spinbox.setMaximum(MAXIMUM_SIZE[Z])
+
+        # Minimum Length
+        self._minimum_length_checkbox = PySide2.QtWidgets.QCheckBox("Minimum Length")
+        self._minimum_length_spinbox = PySide2.QtWidgets.QSpinBox()
+        self._minimum_length_spinbox.setMinimum(0)  # Negative minimum lengths don't make sense
+        self._minimum_length_spinbox.setMaximum(MAXIMUM_LENGTH)  # Minimum lengths > max length doesn't make sense
+
+        # Maximum Length
+        self._maximum_length_checkbox = PySide2.QtWidgets.QCheckBox("Maximum Length")
+        self._maximum_length_spinbox = PySide2.QtWidgets.QSpinBox()
+        self._maximum_length_spinbox.setMinimum(2)  # Maximum lengths < 2 don't make sense
+        self._maximum_length_spinbox.setMaximum(MAXIMUM_LENGTH)  # Maximum lengths > max length doesn't make sense
+
+        # Seed
+        self._seed_checkbox = PySide2.QtWidgets.QCheckBox("Seed")
+        self._seed_le = PySide2.QtWidgets.QLineEdit()
+
+    def _create_layout(self):
+        """Lay out the UI elements"""
+        # Level Size
+        self._level_size_lay = PySide2.QtWidgets.QHBoxLayout()
+        self._level_size_lay.addWidget(self._level_size_lbl)
+        self._level_size_lay.addSpacing(10)
+        self._level_size_lay.addWidget(self._level_size_x_lbl)
+        self._level_size_lay.addWidget(self._level_size_x_spinbox)
+        self._level_size_lay.addSpacing(5)
+        self._level_size_lay.addWidget(self._level_size_y_lbl)
+        self._level_size_lay.addWidget(self._level_size_y_spinbox)
+        self._level_size_lay.addSpacing(5)
+        self._level_size_lay.addWidget(self._level_size_z_lbl)
+        self._level_size_lay.addWidget(self._level_size_z_spinbox)
+        self._level_size_lay.addStretch()
+
+        # Minimum Length
+        self._minimum_length_lay = PySide2.QtWidgets.QHBoxLayout()
+        self._minimum_length_lay.addWidget(self._minimum_length_checkbox)
+        self._minimum_length_lay.addSpacing(5)
+        self._minimum_length_lay.addWidget(self._minimum_length_spinbox)
+        self._minimum_length_lay.addStretch()
+
+        # Minimum Length
+        self._maximum_length_lay = PySide2.QtWidgets.QHBoxLayout()
+        self._maximum_length_lay.addWidget(self._maximum_length_checkbox)
+        self._maximum_length_lay.addSpacing(5)
+        self._maximum_length_lay.addWidget(self._maximum_length_spinbox)
+        self._maximum_length_lay.addStretch()
+
+        # Seed
+        self._seed_lay = PySide2.QtWidgets.QHBoxLayout()
+        self._seed_lay.addWidget(self._seed_checkbox)
+        self._seed_lay.addSpacing(5)
+        self._seed_lay.addWidget(self._seed_le)
+        self._seed_lay.addStretch()
+
+        # Generator Settings Group Box
+        self._generator_lay = PySide2.QtWidgets.QVBoxLayout()
+        self._generator_lay.addLayout(self._level_size_lay)
+        self._generator_lay.addLayout(self._minimum_length_lay)
+        self._generator_lay.addLayout(self._maximum_length_lay)
+        self._generator_lay.addLayout(self._seed_lay)
+        self._generator_group_box.setLayout(self._generator_lay)
+
+        # Main
+        self._main_lay = PySide2.QtWidgets.QVBoxLayout()
+        self._main_lay.addWidget(self._generator_group_box)
+
+        # Set the layout
+        self.setLayout(self._main_lay)
+
+    def _create_connections(self):
+        """Connect widget signals to slots"""
+        # Level Size
+        self._level_size_x_spinbox.valueChanged.connect(self._set_x_size)
+        self._level_size_y_spinbox.valueChanged.connect(self._set_y_size)
+        self._level_size_z_spinbox.valueChanged.connect(self._set_z_size)
+
+        # Minimum Length
+        self._minimum_length_checkbox.toggled.connect(self._checked_minimum)
+        self._minimum_length_spinbox.valueChanged.connect(self._set_minimum)
+
+        # Maximum Length
+        self._maximum_length_checkbox.toggled.connect(self._checked_maximum)
+        self._maximum_length_spinbox.valueChanged.connect(self._set_maximum)
+
+        # Seed
+        self._seed_checkbox.toggled.connect(self._checked_seed)
+        self._seed_le.textEdited.connect(self._set_seed)
+
+    def _block_signals(self):
+        """Block signals while updating info"""
+        self._minimum_length_spinbox.blockSignals(True)
+        self._maximum_length_spinbox.blockSignals(True)
+        self._seed_le.blockSignals(True)
+
+    def _unblock_signals(self):
+        """Unblock signals after updating info"""
+        self._minimum_length_spinbox.blockSignals(False)
+        self._maximum_length_spinbox.blockSignals(False)
+        self._seed_le.blockSignals(False)
+
+    @PySide2.QtCore.Slot()
+    def _set_x_size(self):
+        """Sets the X dimension of the level size"""
+        self._level_gen.size = (self._level_size_x_spinbox.value(),
+                                self._level_gen.size[Y],
+                                self._level_gen.size[Z])
+        self._refresh_view()
+
+    @PySide2.QtCore.Slot()
+    def _set_y_size(self):
+        """Sets the Y dimension of the level size"""
+        self._level_gen.size = (self._level_gen.size[X],
+                                self._level_size_y_spinbox.value(),
+                                self._level_gen.size[Z])
+        self._refresh_view()
+
+    @PySide2.QtCore.Slot()
+    def _set_z_size(self):
+        """Sets the Z dimension of the level size"""
+        self._level_gen.size = (self._level_gen.size[X],
+                                self._level_gen.size[Y],
+                                self._level_size_z_spinbox.value())
+        self._refresh_view()
+
+    @PySide2.QtCore.Slot()
+    def _checked_minimum(self):
+        """Toggles whether a minimum value is set"""
+        self._block_signals()
+        if self._minimum_length_checkbox.isChecked():
+            # Minimum length enabled
+            self._level_gen.minimum_length = 0
+        else:
+            # Minimum length disabled
+            self._level_gen.minimum_length = None
+        self._refresh_view()
+        self._unblock_signals()
+
+    @PySide2.QtCore.Slot()
+    def _set_minimum(self):
+        """Sets the minimum length"""
+        self._level_gen.minimum_length = self._minimum_length_spinbox.value()
+        self._refresh_view()
+
+    @PySide2.QtCore.Slot()
+    def _checked_maximum(self):
+        """Toggles whether a maximum value is set"""
+        self._block_signals()
+        if self._maximum_length_checkbox.isChecked():
+            # Maximum length enabled
+            self._level_gen.maximum_length = MAXIMUM_LENGTH
+        else:
+            # Maximum length disabled
+            self._level_gen.maximum_length = None
+        self._refresh_view()
+        self._unblock_signals()
+
+    @PySide2.QtCore.Slot()
+    def _set_maximum(self):
+        """Sets the maximum length"""
+        self._level_gen.maximum_length = self._maximum_length_spinbox.value()
+        self._refresh_view()
+
+    @PySide2.QtCore.Slot()
+    def _checked_seed(self):
+        """Toggles whether a seed is set"""
+        self._block_signals()
+        if self._seed_checkbox.isChecked():
+            # Seed enabled
+            self._level_gen.seed = ""
+        else:
+            # Seed disabled (use random seed)
+            self._level_gen.seed = None
+        self._refresh_view()
+        self._unblock_signals()
+
+    @PySide2.QtCore.Slot()
+    def _set_seed(self):
+        """Sets the seed"""
+        self._level_gen.seed = self._seed_le.text()
+        self._refresh_view()
