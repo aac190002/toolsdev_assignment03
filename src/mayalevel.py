@@ -22,9 +22,11 @@ import shiboken2
 X = 0  # Element of size tuple
 Y = 1  # Element of size tuple
 Z = 2  # Element of size tuple
-DEFAULT_BLOCK_SIZE = (10, 5, 10)  # Default dimensions for a unit block in Maya
+DEFAULT_BLOCK_SIZE = (10.0, 5.0, 10.0)  # Default dimensions for a unit block in Maya
 DEFAULT_GROUP_NAME = "groupBlock"  # Default name for the group to look for within the Maya scenes
 LOG = logging.getLogger(__name__)
+MAXIMUM_BLOCK_DIMENSION = 1e6  # The code has no maximum, but for the sake of the UI, we should set one
+MAXIMUM_BLOCK_PRECISION = 2  # The code has no maximum, but for the sake of the UI, we should set one
 MAXIMUM_SIZE = (50, 10, 50)  # The code has no maximum, but for the sake of running quickly, we should set one
 MAXIMUM_LENGTH = MAXIMUM_SIZE[X] * MAXIMUM_SIZE[Y] * MAXIMUM_SIZE[Z]  # Longest possible path
 
@@ -138,11 +140,19 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         self._seed_le.setText(str(self._level_gen.seed) if self._level_gen.seed is not None else "")
         self._seed_le.setEnabled(self._level_gen.seed is not None)
 
+        # Block Size
+        self._block_size_x_spinbox.setValue(self._scene_gen.block_dimensions[X])
+        self._block_size_y_spinbox.setValue(self._scene_gen.block_dimensions[Y])
+        self._block_size_z_spinbox.setValue(self._scene_gen.block_dimensions[Z])
+
+        # Group Name
+        self._group_name_le.setText(self._scene_gen.group_name)
+
     def _create_widgets(self):
         """Create widgets for the UI"""
         # Generator Settings Group
         self._generator_group_box = PySide2.QtWidgets.QGroupBox()
-        self._generator_group_box.setTitle("Generator Settings")
+        self._generator_group_box.setTitle("Level Generator Settings")
 
         # Level Size
         self._level_size_lbl = PySide2.QtWidgets.QLabel("Level Size")
@@ -177,6 +187,38 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         # Seed
         self._seed_checkbox = PySide2.QtWidgets.QCheckBox("Seed")
         self._seed_le = PySide2.QtWidgets.QLineEdit()
+
+        # Scene Settings Group
+        self._scene_group_box = PySide2.QtWidgets.QGroupBox()
+        self._scene_group_box.setTitle("Maya Scene Settings")
+
+        # Block Size
+        self._block_size_lbl = PySide2.QtWidgets.QLabel("Block Size")
+        # X
+        self._block_size_x_lbl = PySide2.QtWidgets.QLabel("X")
+        self._block_size_x_spinbox = PySide2.QtWidgets.QDoubleSpinBox()
+        self._block_size_x_spinbox.setMinimum(0)
+        self._block_size_x_spinbox.setMaximum(MAXIMUM_BLOCK_DIMENSION)
+        self._block_size_x_spinbox.setDecimals(MAXIMUM_BLOCK_PRECISION)
+        self._block_size_x_spinbox.setSingleStep(float("1e-{}".format(MAXIMUM_BLOCK_PRECISION)))
+        # Y
+        self._block_size_y_lbl = PySide2.QtWidgets.QLabel("Y")
+        self._block_size_y_spinbox = PySide2.QtWidgets.QDoubleSpinBox()
+        self._block_size_y_spinbox.setMinimum(0)
+        self._block_size_y_spinbox.setMaximum(MAXIMUM_BLOCK_DIMENSION)
+        self._block_size_y_spinbox.setDecimals(MAXIMUM_BLOCK_PRECISION)
+        self._block_size_x_spinbox.setSingleStep(float("1e-{}".format(MAXIMUM_BLOCK_PRECISION)))
+        # Z
+        self._block_size_z_lbl = PySide2.QtWidgets.QLabel("Z")
+        self._block_size_z_spinbox = PySide2.QtWidgets.QDoubleSpinBox()
+        self._block_size_z_spinbox.setMinimum(0)
+        self._block_size_z_spinbox.setMaximum(MAXIMUM_BLOCK_DIMENSION)
+        self._block_size_z_spinbox.setDecimals(MAXIMUM_BLOCK_PRECISION)
+        self._block_size_x_spinbox.setSingleStep(float("1e-{}".format(MAXIMUM_BLOCK_PRECISION)))
+
+        # Group Name
+        self._group_name_lbl = PySide2.QtWidgets.QLabel("Maya Group Name")
+        self._group_name_le = PySide2.QtWidgets.QLineEdit()
 
     def _create_layout(self):
         """Lay out the UI elements"""
@@ -223,9 +265,37 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         self._generator_lay.addLayout(self._seed_lay)
         self._generator_group_box.setLayout(self._generator_lay)
 
+        # Block Size
+        self._block_size_lay = PySide2.QtWidgets.QHBoxLayout()
+        self._block_size_lay.addWidget(self._block_size_lbl)
+        self._block_size_lay.addSpacing(10)
+        self._block_size_lay.addWidget(self._block_size_x_lbl)
+        self._block_size_lay.addWidget(self._block_size_x_spinbox)
+        self._block_size_lay.addSpacing(5)
+        self._block_size_lay.addWidget(self._block_size_y_lbl)
+        self._block_size_lay.addWidget(self._block_size_y_spinbox)
+        self._block_size_lay.addSpacing(5)
+        self._block_size_lay.addWidget(self._block_size_z_lbl)
+        self._block_size_lay.addWidget(self._block_size_z_spinbox)
+        self._block_size_lay.addStretch()
+
+        # Group Name
+        self._group_name_lay = PySide2.QtWidgets.QHBoxLayout()
+        self._group_name_lay.addWidget(self._group_name_lbl)
+        self._group_name_lay.addSpacing(10)
+        self._group_name_lay.addWidget(self._group_name_le)
+        self._group_name_lay.addStretch()
+
+        # Maya Scene Group Box
+        self._scene_lay = PySide2.QtWidgets.QVBoxLayout()
+        self._scene_lay.addLayout(self._block_size_lay)
+        self._scene_lay.addLayout(self._group_name_lay)
+        self._scene_group_box.setLayout(self._scene_lay)
+
         # Main
         self._main_lay = PySide2.QtWidgets.QVBoxLayout()
         self._main_lay.addWidget(self._generator_group_box)
+        self._main_lay.addWidget(self._scene_group_box)
 
         # Set the layout
         self.setLayout(self._main_lay)
@@ -248,6 +318,14 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
         # Seed
         self._seed_checkbox.toggled.connect(self._checked_seed)
         self._seed_le.textEdited.connect(self._set_seed)
+        
+        # Block Size
+        self._block_size_x_spinbox.valueChanged.connect(self._set_x_block_size)
+        self._block_size_y_spinbox.valueChanged.connect(self._set_y_block_size)
+        self._block_size_z_spinbox.valueChanged.connect(self._set_z_block_size)
+
+        # Group Name
+        self._group_name_le.textEdited.connect(self._set_group_name)
 
     def _block_signals(self):
         """Block signals while updating info"""
@@ -340,4 +418,34 @@ class MayaSceneLevelGeneratorUI(PySide2.QtWidgets.QDialog):
     def _set_seed(self):
         """Sets the seed"""
         self._level_gen.seed = self._seed_le.text()
+        self._refresh_view()
+
+    @PySide2.QtCore.Slot()
+    def _set_x_block_size(self):
+        """Sets the X dimension of the block size"""
+        self._scene_gen.block_dimensions = (self._block_size_x_spinbox.value(),
+                                            self._scene_gen.block_dimensions[Y],
+                                            self._scene_gen.block_dimensions[Z])
+        self._refresh_view()
+
+    @PySide2.QtCore.Slot()
+    def _set_y_block_size(self):
+        """Sets the Y dimension of the block size"""
+        self._scene_gen.block_dimensions = (self._scene_gen.block_dimensions[X],
+                                            self._block_size_y_spinbox.value(),
+                                            self._scene_gen.block_dimensions[Z])
+        self._refresh_view()
+
+    @PySide2.QtCore.Slot()
+    def _set_z_block_size(self):
+        """Sets the Z dimension of the block size"""
+        self._scene_gen.block_dimensions = (self._scene_gen.block_dimensions[X],
+                                            self._scene_gen.block_dimensions[Y],
+                                            self._block_size_z_spinbox.value())
+        self._refresh_view()
+
+    @PySide2.QtCore.Slot()
+    def _set_group_name(self):
+        """Sets the group name for reading the Maya scene files"""
+        self._scene_gen.group_name = self._group_name_le.text()
         self._refresh_view()
